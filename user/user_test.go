@@ -2,6 +2,7 @@ package user_test
 
 import (
 	"errors"
+	"log"
 	"testing"
 
 	"github.com/golang/mock/gomock"
@@ -80,6 +81,25 @@ func TestCountWithMockGen(t *testing.T) {
 				So(res, ShouldEqual, 0)
 			})
 		})
+
+		Convey("When we want the mock to do something extra with the input", func() {
+			m.
+				EXPECT().
+				Count(gomock.Not("bar")).
+				Return(0, errors.New("some-error")).
+				Times(1).
+				Do(func(x string) {
+					log.Println("Received:", x)
+				})
+
+			res, err := u.Count(s)
+
+			Convey("Should return error and 0", func() {
+				So(err, ShouldNotBeNil)
+				So(res, ShouldEqual, 0)
+			})
+		})
+
 	})
 }
 
