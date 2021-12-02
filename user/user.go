@@ -1,11 +1,26 @@
 package user
 
-import "github.com/emiliomarin/go-mock/counter"
+import (
+	"github.com/emiliomarin/go-mock/counter"
+	"github.com/emiliomarin/go-mock/doer"
+)
 
 type User struct {
 	Counter counter.Counter
+	Doer    doer.Doer
 }
 
-func (u User) Count(s string) (int, error) {
-	return u.Counter.Count(s)
+func (u User) CountAndDo(s string) error {
+	count, err := u.Counter.Count(s)
+	if err != nil {
+		return err
+	}
+
+	for i := 0; i < count; i++ {
+		err = u.Doer.Do()
+		if err != nil {
+			return err
+		}
+	}
+	return nil
 }
