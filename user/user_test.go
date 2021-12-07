@@ -18,18 +18,22 @@ func TestCountWithManualMock(t *testing.T) {
 		expectedCount := 3
 
 		mockCounter := &mockCounter{}
+		mockDoer := &mockDoer{}
 
 		u := user.User{
 			Counter: mockCounter,
+			Doer:    mockDoer,
 		}
 
 		Convey("When it's successful", func() {
 			mockCounter.countFn = func(s string) (int, error) { return expectedCount, nil }
+			mockDoer.doFn = func() error { return nil }
 
 			err := u.CountAndDo(s)
 
 			Convey("Should return no error and the expected count", func() {
 				So(err, ShouldBeNil)
+				So(mockDoer.calls, ShouldEqual, expectedCount)
 			})
 		})
 
@@ -54,13 +58,16 @@ func TestCountWithMockGen(t *testing.T) {
 		defer ctrl.Finish()
 
 		mockCounter := mocks.NewMockCounter(ctrl)
+		mockDoer := mocks.NewMockDoer(ctrl)
 		u := user.User{
 			Counter: mockCounter,
+			Doer:    mockDoer,
 		}
 
 		Convey("When it's successful", func() {
 			// Instead of foo we could do gomock.Any() if we don't care about the input
 			mockCounter.EXPECT().Count("foo").Return(expectedCount, nil).Times(1)
+			mockDoer.EXPECT().Do().Return(nil).Times(expectedCount)
 
 			err := u.CountAndDo(s)
 
@@ -88,6 +95,7 @@ func TestCountWithMockGen(t *testing.T) {
 				Do(func(x string) {
 					log.Println("Received:", x)
 				})
+			mockDoer.EXPECT().Do().Return(nil).Times(0)
 
 			err := u.CountAndDo(s)
 
@@ -104,13 +112,15 @@ type mockCounter struct {
 }
 
 func (m mockCounter) Count(s string) (int, error) {
-	return mockCounter.countFn(s)
+	return m.countFn(s)
 }
 
 type mockDoer struct {
-	doFn func() error
+	calls int
+	doFn  func() error
 }
 
-func (m mockDoer) Do() error {
-	return mockCounter.doFn()
+func (m *mockDoer) Do() error {
+	m.calls++
+	return m.doFn()
 }
