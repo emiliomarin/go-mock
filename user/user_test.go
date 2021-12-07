@@ -34,6 +34,7 @@ func TestCountAndDoWithManualMock(t *testing.T) {
 
 			Convey("Should return no error and the expected count", func() {
 				So(err, ShouldBeNil)
+				So(mockCounter.recordedInput, ShouldEqual, "foo")
 				So(mockDoer.calls, ShouldEqual, expectedCount)
 			})
 		})
@@ -167,10 +168,12 @@ func TestCountAndDoAsync(t *testing.T) {
 }
 
 type mockCounter struct {
-	countFn func(s string) (int, error)
+	recordedInput string
+	countFn       func(s string) (int, error)
 }
 
-func (m mockCounter) Count(s string) (int, error) {
+func (m *mockCounter) Count(s string) (int, error) {
+	m.recordedInput = s
 	return m.countFn(s)
 }
 
