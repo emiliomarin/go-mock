@@ -3,6 +3,7 @@ package user_test
 import (
 	"errors"
 	"log"
+	"sync"
 	"testing"
 
 	"github.com/golang/mock/gomock"
@@ -12,7 +13,7 @@ import (
 	"github.com/emiliomarin/go-mock/user"
 )
 
-func TestCountWithManualMock(t *testing.T) {
+func TestCountAndDoWithManualMock(t *testing.T) {
 	Convey("Given we want to count characters in a string", t, func() {
 		s := "foo"
 		expectedCount := 3
@@ -49,7 +50,7 @@ func TestCountWithManualMock(t *testing.T) {
 	})
 }
 
-func TestCountWithMockGen(t *testing.T) {
+func TestCountAndDoWithMockGen(t *testing.T) {
 	Convey("Given we want to count characters in a string", t, func() {
 		s := "foo"
 		expectedCount := 3
@@ -107,6 +108,64 @@ func TestCountWithMockGen(t *testing.T) {
 	})
 }
 
+func TestCountAndDoAsync(t *testing.T) {
+	Convey("Given we want to count and do async", t, func() {
+		s := "foo"
+		expectedCount := 3
+
+		Convey("When we use manual mocks", func() {
+			mockCounter := &mockCounter{
+				countFn: func(s string) (int, error) { return expectedCount, nil },
+			}
+			mockDoer := &mockDoer{
+				doFn: func() error { return nil },
+				wg:   &sync.WaitGroup{},
+			}
+
+			u := user.User{
+				Counter: mockCounter,
+				Doer:    mockDoer,
+			}
+
+			mockDoer.wg.Add(expectedCount)
+			err := u.CountAndDoAsync(s)
+			mockDoer.wg.Wait()
+
+			Convey("Should return no error", func() {
+				So(err, ShouldBeNil)
+				So(mockDoer.calls, ShouldEqual, expectedCount)
+			})
+
+		})
+
+		Convey("When we use mockgen", func() {
+			ctrl := gomock.NewController(t)
+			defer ctrl.Finish()
+			var wg sync.WaitGroup
+
+			mockCounter := mocks.NewMockCounter(ctrl)
+			mockDoer := mocks.NewMockDoer(ctrl)
+
+			u := user.User{
+				Counter: mockCounter,
+				Doer:    mockDoer,
+			}
+
+			mockCounter.EXPECT().Count(gomock.Any()).Return(expectedCount, nil).Times(1)
+			mockDoer.EXPECT().Do().Return(nil).Times(expectedCount).Do(func() { wg.Done() })
+
+			wg.Add(expectedCount)
+			err := u.CountAndDoAsync(s)
+			wg.Wait()
+
+			Convey("Should return no error", func() {
+				So(err, ShouldBeNil)
+			})
+
+		})
+	})
+}
+
 type mockCounter struct {
 	countFn func(s string) (int, error)
 }
@@ -118,9 +177,13 @@ func (m mockCounter) Count(s string) (int, error) {
 type mockDoer struct {
 	calls int
 	doFn  func() error
+	wg    *sync.WaitGroup
 }
 
 func (m *mockDoer) Do() error {
+	if m.wg != nil {
+		defer m.wg.Done()
+	}
 	m.calls++
 	return m.doFn()
 }

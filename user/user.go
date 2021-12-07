@@ -24,3 +24,17 @@ func (u User) CountAndDo(s string) error {
 	}
 	return nil
 }
+
+func (u User) CountAndDoAsync(s string) error {
+	count, err := u.Counter.Count(s)
+	if err != nil {
+		return err
+	}
+
+	for i := 0; i < count; i++ {
+		go func() {
+			u.Doer.Do()
+		}()
+	}
+	return nil
+}
